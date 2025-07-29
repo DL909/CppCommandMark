@@ -12,6 +12,7 @@
 #include <format>
 #include <list>
 #include <algorithm>
+#include <cstdlib>
 
 #include "fuzzy_match.h"
 
@@ -111,11 +112,57 @@ int mark(const std::string& command)
 
 int delete_mark(long id)
 {
-    //TODO
-    error_messages.emplace_back(std::format("delete_mark() error: not finished, will delete line {0:d} and {1:d}\n",
-                                            id * 2, id * 2 + 1));
-    return EXIT_FAILURE;
-    return EXIT_SUCCESS;
+    int result = EXIT_SUCCESS;
+    const std::string file_path = static_cast<std::string>(getenv("HOME")) + "/.command_mark";
+    const std::string bak_file_path = file_path + ".bak";
+    if (access(bak_file_path.c_str(),F_OK) == 0)
+    {
+        if (remove(bak_file_path.c_str()) != 0)
+        {
+            error_messages.emplace_back(std::format("mark() error: could not remove file {}\n", bak_file_path));
+            result = EXIT_FAILURE;
+            return result;
+        }
+    }
+    if (rename(file_path.c_str(), bak_file_path.c_str()) != 0)
+    {
+        error_messages.emplace_back(std::format("mark() error: could not rename file {}\n", file_path));
+        result = EXIT_FAILURE;
+        return result;
+    }
+    std::ifstream old_file(bak_file_path);
+    if (!old_file.is_open())
+    {
+        error_messages.emplace_back(std::format("mark() error: could not open file {}\n", bak_file_path));
+        result = EXIT_FAILURE;
+        return result;
+    }
+    std::ofstream new_file(file_path);
+    if (!new_file.is_open())
+    {
+        error_messages.emplace_back(std::format("mark() error: could not open file {}\n", file_path));
+        result = EXIT_FAILURE;
+        return result;
+    }
+    std::string temp;
+    std::string deleted_line1;
+    std::string deleted_line2;
+    int index = 0;
+    while (index < id * 2)
+    {
+        std::getline(old_file, temp);
+        new_file << temp << std::endl;
+        index++;
+    }
+    std::getline(old_file, deleted_line1);
+    std::getline(old_file, deleted_line2);
+    std::getline(old_file, temp);
+    while (!temp.empty())
+    {
+        new_file << temp << std::endl;
+        std::getline(old_file, temp);
+    }
+    return result;
 }
 
 int help()
@@ -354,7 +401,7 @@ int choose(std::string& command, long& id)
     echo();
     endwin();
     command = std::format("cd \"{}\";{}", tasks[choice].path, tasks[choice].command);
-    id = choice;
+    id = tasks[choice].index;
     return result;
 }
 
