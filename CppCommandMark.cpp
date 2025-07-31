@@ -4,15 +4,15 @@
 
 #include "CppCommandMark.h"
 #include <iostream>
-#include <ncurses.h>
+#include <ncurses/ncurses.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <fstream>
 #include <vector>
-#include <format>
-#include <list>
+#include <fmt/format.h>
 #include <algorithm>
 #include <cstdlib>
+#include <filesystem>
 
 #include "fuzzy_match.h"
 
@@ -65,7 +65,7 @@ MODE parameter_processor(int argc, const char** argv, std::string& str, long& id
             }
             else
             {
-                str = std::format(
+                str = fmt::format(
                     "parameter_processor() error: mark mode needs second parameter as command, provided %d", argc - 2);
                 return ERROR;
             }
@@ -84,7 +84,7 @@ std::string get_path()
     }
     catch (const std::filesystem::filesystem_error& e)
     {
-        error_messages.emplace_back(std::format("get_path() error: {}\n", e.what()));
+        error_messages.emplace_back(fmt::format("get_path() error: {}\n", e.what()));
         return "";
     }
 }
@@ -101,7 +101,7 @@ int mark(const std::string& command)
     std::ofstream ofstream(file_path, std::ios::app);
     if (!ofstream.is_open())
     {
-        error_messages.emplace_back(std::format("mark() error: could not open file {}\n", file_path));
+        error_messages.emplace_back(fmt::format("mark() error: could not open file {}\n", file_path));
         return EXIT_FAILURE;
     }
     ofstream << command << std::endl << path << std::endl;
@@ -119,28 +119,28 @@ int delete_mark(long id)
     {
         if (remove(bak_file_path.c_str()) != 0)
         {
-            error_messages.emplace_back(std::format("mark() error: could not remove file {}\n", bak_file_path));
+            error_messages.emplace_back(fmt::format("mark() error: could not remove file {}\n", bak_file_path));
             result = EXIT_FAILURE;
             return result;
         }
     }
     if (rename(file_path.c_str(), bak_file_path.c_str()) != 0)
     {
-        error_messages.emplace_back(std::format("mark() error: could not rename file {}\n", file_path));
+        error_messages.emplace_back(fmt::format("mark() error: could not rename file {}\n", file_path));
         result = EXIT_FAILURE;
         return result;
     }
     std::ifstream old_file(bak_file_path);
     if (!old_file.is_open())
     {
-        error_messages.emplace_back(std::format("mark() error: could not open file {}\n", bak_file_path));
+        error_messages.emplace_back(fmt::format("mark() error: could not open file {}\n", bak_file_path));
         result = EXIT_FAILURE;
         return result;
     }
     std::ofstream new_file(file_path);
     if (!new_file.is_open())
     {
-        error_messages.emplace_back(std::format("mark() error: could not open file {}\n", file_path));
+        error_messages.emplace_back(fmt::format("mark() error: could not open file {}\n", file_path));
         result = EXIT_FAILURE;
         return result;
     }
@@ -168,7 +168,7 @@ int delete_mark(long id)
 int help()
 {
     //TODO
-    error_messages.emplace_back(std::format("help() error: not finished\n"));
+    error_messages.emplace_back(fmt::format("help() error: not finished\n"));
     return EXIT_FAILURE;
     return EXIT_SUCCESS;
 }
@@ -216,7 +216,7 @@ inline void rend(const int line, const task& task, const bool choose)
     const int command_cols = COLS - 6 - path_cols - 4 - (debug ? score_long : 0);
     const int command_start = 2 + (debug ? score_long : 0);
     const int path_start = command_cols + 10 + (debug ? score_long : 0);
-    if (debug) { mvprintw(line, 2, "%d", task.score); }
+    if (debug) { mvprintw(line, 2, "%ld", task.score); }
     if (task.command.length() >= command_cols)
     {
         mvprintw(line, command_start, "%s...", task.command.substr(0, command_cols).c_str());
@@ -305,7 +305,7 @@ int choose(std::string& command, long& id)
     noecho();
     curs_set(1);
     int choice = 0;
-    const int number = std::min(LINES - 3 - (debug ? 3 : 0), static_cast<int>(tasks.size()));
+    const int number = std::min(LINES - 3 - (debug ? 3 : 0), static_cast<int>(tasks.size())-1);
     int index = 0;
     std::string input;
     sort_tasks(tasks);
@@ -394,13 +394,14 @@ int choose(std::string& command, long& id)
         }
         mvprintw(LINES - 1, 2, "%s", (static_cast<std::string>(" ") * (COLS-2)).c_str());
         mvprintw(LINES - 1, 2, "%s", input.c_str());
+        //mvcur(LINES -1,LINES-1,index+2,index+2);
         mvprintw(LINES - 1,index + 2,"");
 
     }
 
     echo();
     endwin();
-    command = std::format("cd \"{}\";{}", tasks[choice].path, tasks[choice].command);
+    command = fmt::format("cd \"{}\";{}", tasks[choice].path, tasks[choice].command);
     id = tasks[choice].index;
     return result;
 }
@@ -413,19 +414,14 @@ int leave_text_in_terminal(const char* text_to_leave)
     for (int i = 0; i < strlen(text_to_leave); ++i)
     {
         char c = text_to_leave[i];
-
-        // 使用 ioctl 系统调用和 TIOCSTI 请求
-        // TIOCSTI (Terminal I/O Control Simulate Terminal Input)
-        // 这个操作会将字符 'c' 插入到终端的输入队列中。
-        // 第一个参数 0 (STDIN_FILENO) 代表标准输入，也就是当前终端。
-        if (ioctl(STDIN_FILENO, TIOCSTI, &c) < 0)
+        int t =ioctl(STDIN_FILENO, TIOCSTI, &c);
+        if ( t < 0)
         {
-            // 如果操作失败，打印错误信息并返回
-            error_messages.emplace_back("leave_text_in_terminal() error: ioctl TIOCSTI failed");
+            error_messages.emplace_back(fmt::format("leave_text_in_terminal() error: ioctl() failed : {}\n",errno));
             return EXIT_FAILURE;
         }
     }
-    echo(); //恢复输出
+    echo();
     endwin();
     return EXIT_SUCCESS;
 }
@@ -447,7 +443,9 @@ int cpp_command_mark(const int argc, const char** argv)
         {
             break;
         }
-        result = leave_text_in_terminal(param.c_str());
+        if ((result = leave_text_in_terminal(param.c_str())) != EXIT_SUCCESS) {
+            error_messages.emplace_back(fmt::format("{}", param));
+        }
         break;
     case DELETE:
         if ((result = choose(param, id)) != EXIT_SUCCESS)
@@ -466,5 +464,6 @@ int cpp_command_mark(const int argc, const char** argv)
             std::cout << error;
         }
     }
+    std::cout << std::endl;
     return result;
 }
