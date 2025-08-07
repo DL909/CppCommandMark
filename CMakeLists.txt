@@ -11,8 +11,8 @@ find_package(fmt CONFIG REQUIRED)
 add_subdirectory(3rd-party/fuzzy-match)
 
 add_executable(CppCommandMark main.cpp
-        CppCommandMark.cpp
-        CppCommandMark.h)
+        opt_processor.cpp
+        )
 
 target_include_directories(CppCommandMark PRIVATE ${CURSES_INCLUDE_DIRS})
 target_compile_options(CppCommandMark PRIVATE ${CURSES_CFLAGS})
@@ -23,8 +23,8 @@ target_include_directories(CppCommandMark PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/3rd
 target_link_libraries(CppCommandMark PUBLIC fuzzy_match)
 
 add_executable(test test.cpp
-        CppCommandMark.cpp
-        CppCommandMark.h)
+        opt_processor.cpp
+        )
 
 target_include_directories(test PRIVATE ${CURSES_INCLUDE_DIRS})
 target_compile_options(test PRIVATE ${CURSES_CFLAGS})
