@@ -20,12 +20,6 @@ int foo2(const char * param, void * place_to_save)
 
 int main(const int argc, const char** argv)
 {
-    std::vector<option> options = {};
-    int temp = 0;
-
-    options.push_back(option("test",'t',true,foo1,static_cast<void*>(&temp)));
-    options.push_back(option("est",'e',false,foo2,static_cast<void*>(&temp)));
-    std::cout << process(argc, argv, options) << std::endl;
-    std::cout << temp << std::endl;
+    std::cout << "\tmark <command> [options]" << std::endl;
     return 0;
 }

@@ -60,7 +60,7 @@ int process(const int argc, const char** argv, const std::vector<option>& option
             {
                 if (argv[opt_index][opt_index_of_current] == 0)
                 {
-                    opt_index = arg_index + 1;
+                    opt_index = arg_index ;
                     arg_index = opt_index + 1;
                     opt_index_of_current = 1;
                 }else

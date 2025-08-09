@@ -14,7 +14,8 @@
 #include <filesystem>
 
 #include <fuzzy_match.h>
-#include <getopt.h>
+
+#include "opt_processor.h"
 
 
 constexpr int score_long = 20;
@@ -22,23 +23,24 @@ std::vector<std::string> error_messages;
 
 enum RESPONSE_MODE
 {
-    COMMAND=0,
-    TEXT=1,
+    COMMAND = 0,
+    TEXT = 1,
 };
 
 // parameter flag
-bool verbose_flag = true;
+bool verbose_flag = false;
 bool directory_flag = false; // given directory rather than using current directory
 std::string path;
+std::string file_path;
 RESPONSE_MODE response_mode = COMMAND;
 
 enum MODE
 {
-    ERROR=0,
-    MARK=1,
-    CHECK=2,
-    DELETE=3,
-    HELP=4,
+    ERROR = 0,
+    MARK = 1,
+    CHECK = 2,
+    DELETE = 3,
+    HELP = 4,
 };
 
 
@@ -59,46 +61,6 @@ public:
         score = 200;
     }
 };
-
-MODE parameter_processor(int argc, const char** argv, std::string& str, long& id)
-{
-
-    if (argc == 1)
-    {
-        return CHECK;
-    }
-    if (argc >= 2)
-    {
-        if (strcmp(argv[1], "-c") == 0 || strcmp(argv[1], "--check") == 0)
-        {
-            return CHECK;
-        }
-        if (strcmp(argv[1], "-d") == 0 || strcmp(argv[1], "--delete") == 0)
-        {
-            return DELETE;
-        }
-        if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)
-        {
-            return HELP;
-        }
-        if (strcmp(argv[1], "-m") == 0 || strcmp(argv[1], "--mark") == 0)
-        {
-            if (argc == 3)
-            {
-                str = argv[2];
-            }
-            else
-            {
-                str = fmt::format(
-                    "parameter_processor() error: mark mode needs second parameter as command, provided %d", argc - 2);
-                return ERROR;
-            }
-            return MARK;
-        }
-        return ERROR;
-    }
-    return ERROR;
-}
 
 std::string get_path()
 {
@@ -124,23 +86,32 @@ int mark(const std::string& command)
         error_messages.emplace_back("mark() error: can't get path\n");
         return EXIT_FAILURE;
     }
-    const std::string file_path = static_cast<std::string>(getenv("HOME")) + "/.command_mark";
-    std::ofstream ofstream(file_path, std::ios::app);
-    if (!ofstream.is_open())
+    std::cout << fmt::format("command = {}\nin path {}\n type y to agree\n", command, path);
+    if (getchar() == 'y')
     {
-        error_messages.emplace_back(fmt::format("mark() error: could not open file {}\n", file_path));
-        return EXIT_FAILURE;
+        const std::string file_path = static_cast<std::string>(getenv("HOME")) + "/.command_mark";
+        std::ofstream ofstream(file_path, std::ios::app);
+        if (!ofstream.is_open())
+        {
+            error_messages.emplace_back(fmt::format("mark() error: could not open file {}\n", file_path));
+            return EXIT_FAILURE;
+        }
+        ofstream << command << std::endl << path << std::endl;
+        ofstream.close();
+        std::cout << "marked command: \n" << command << std::endl << "in directory: \n" << path << std::endl;
+        return EXIT_SUCCESS;
     }
-    ofstream << command << std::endl << path << std::endl;
-    ofstream.close();
-    std::cout << "marked command: \n" << command << std::endl << "in directory: \n" << path << std::endl;
-    return EXIT_SUCCESS;
+    error_messages.emplace_back("mark() error: user interrupted");
+    return EXIT_FAILURE;
 }
 
 int delete_mark(long id)
 {
     int result = EXIT_SUCCESS;
-    const std::string file_path = static_cast<std::string>(getenv("HOME")) + "/.command_mark";
+    if (file_path.empty())
+    {
+        file_path = static_cast<std::string>(getenv("HOME")) + "/.command_mark";
+    }
     const std::string bak_file_path = file_path + ".bak";
     if (access(bak_file_path.c_str(),F_OK) == 0)
     {
@@ -194,15 +165,30 @@ int delete_mark(long id)
 
 int help()
 {
-    //TODO
-    error_messages.emplace_back(fmt::format("help() error: not finished\n"));
-    return EXIT_FAILURE;
+
+    std::cout << "Cpp Command Mark" << std::endl;
+    std::cout << "usage:" << std::endl;
+    std::cout << "\t./CppCommandMark <option> [args]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "\t--help(-h): show this help" << std::endl;
+    std::cout << "\t--check(-c): choose command and use ( default )" << std::endl;
+    std::cout << "\t--delete(-d): choose command and delete" << std::endl;
+    std::cout << "\t--mark(-x): mark command" << std::endl;
+    std::cout << "\t\t--directory(-d): manually choose where the command will run" << std::endl;
+    std::cout << "extra options:" << std::endl;
+    std::cout << "\t--verbose(-v): show verbose output" << std::endl;
+    std::cout << "\t--file(-f): manually choose where the information file is" << std::endl;
+
     return EXIT_SUCCESS;
 }
 
 std::vector<task> get_task_list()
 {
-    const std::string file_path = static_cast<std::string>(getenv("HOME")) + "/.command_mark";
+    if (file_path.empty())
+    {
+        file_path = static_cast<std::string>(getenv("HOME")) + "/.command_mark";
+    }
     std::ifstream ifstream;
     ifstream.open(file_path);
     if (!ifstream.is_open())
@@ -271,7 +257,7 @@ inline void rend(const int line, const task& task, const bool choose)
     }
 }
 
-inline void sort_tasks(std::vector<task> & tasks)
+inline void sort_tasks(std::vector<task>& tasks)
 {
     std::ranges::sort(tasks, [](const task& a, const task& b)
     {
@@ -332,13 +318,22 @@ int choose(std::string& command, long& id)
     noecho();
     curs_set(1);
     int choice = 0;
-    const int number = std::min(LINES - 3 - (verbose_flag ? 3 : 0), static_cast<int>(tasks.size())-1);
+    const int number = std::min(LINES - 3 - (verbose_flag ? 3 : 0), static_cast<int>(tasks.size()) - 1);
     int index = 0;
     std::string input;
     sort_tasks(tasks);
     for (int i = 0; i < std::min(LINES - 2, static_cast<int>(tasks.size())); i++)
     {
         rend(LINES - 2 - i, tasks[i], choice == i);
+    }
+    if (verbose_flag)
+    {
+        mvprintw(0, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
+        mvprintw(1, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
+        mvprintw(2, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
+        mvprintw(0, 0, "command : %s", p_command.c_str());
+        mvprintw(1, 0, "path    : %s", p_path.c_str());
+        mvprintw(2, 0, "choice  : %d", choice);
     }
     mvprintw(LINES - 1, 0, "> ");
     while (continue_flag)
@@ -371,20 +366,22 @@ int choose(std::string& command, long& id)
                 {
                     continue;
                 }
-                if (c <= 126){
-                    input.insert(index,std::string(1,static_cast<char>(c)));
+                if (c <= 126)
+                {
+                    input.insert(index, std::string(1, static_cast<char>(c)));
                     index++;
-                }else if (c == 127 || c == KEY_BACKSPACE)
+                }
+                else if (c == 127 || c == KEY_BACKSPACE)
                 {
                     if (index > 0)
                     {
-                        input.erase(index -1,1);
+                        input.erase(index - 1, 1);
                         index--;
-                    }else
+                    }
+                    else
                     {
                         continue;
                     }
-
                 }
             }
 
@@ -406,24 +403,26 @@ int choose(std::string& command, long& id)
             }
             sort_tasks(tasks);
 
-            if (verbose_flag)
-            {
-                mvprintw(0, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
-                mvprintw(1, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
-                mvprintw(0, 0, "command : %s", p_command.c_str());
-                mvprintw(1, 0, "path    : %s", p_path.c_str());
-            }
+
             break;
         }
-        for (int i = 0; i < number; i++)
+        if (verbose_flag)
         {
-            rend(LINES - 2 - i, tasks[i], choice == i);
+            mvprintw(0, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
+            mvprintw(1, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
+            mvprintw(2, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
+            mvprintw(0, 0, "command : %s", p_command.c_str());
+            mvprintw(1, 0, "path    : %s", p_path.c_str());
+            mvprintw(2, 0, "choice  : %d", choice);
         }
-        mvprintw(LINES - 1, 2, "%s", (static_cast<std::string>(" ") * (COLS-2)).c_str());
+        for (int i = 0; i <= number; i++)
+        {
+            rend(LINES - 2 - i, tasks[i], i == choice);
+        }
+        mvprintw(LINES - 1, 2, "%s", (static_cast<std::string>(" ") * (COLS - 2)).c_str());
         mvprintw(LINES - 1, 2, "%s", input.c_str());
         //mvcur(LINES -1,LINES-1,index+2,index+2);
-        mvprintw(LINES - 1,index + 2,"");
-
+        mvprintw(LINES - 1, index + 2, "");
     }
 
     echo();
@@ -433,8 +432,6 @@ int choose(std::string& command, long& id)
     return result;
 }
 
-
-
 int leave_text_in_terminal(const char* text_to_leave)
 {
     initscr();
@@ -443,8 +440,8 @@ int leave_text_in_terminal(const char* text_to_leave)
     for (int i = 0; i < strlen(text_to_leave); ++i)
     {
         char c = text_to_leave[i];
-        int t =ioctl(STDIN_FILENO, TIOCSTI, &c);
-        if ( t < 0)
+        int t = ioctl(STDIN_FILENO, TIOCSTI, &c);
+        if (t < 0)
         {
             error_messages.emplace_back(fmt::format("leave_text_in_terminal() error: ioctl() failed : {}\n",errno));
             return EXIT_FAILURE;
@@ -455,12 +452,95 @@ int leave_text_in_terminal(const char* text_to_leave)
     return EXIT_SUCCESS;
 }
 
+// parameter processer function
+
+bool mode_flag = false;
+
+MODE mode = CHECK;
+
+int p_check(const char* param, void* place_to_save)
+{
+    if (mode_flag)
+    {
+        return 1;
+    }
+    mode = CHECK;
+    return 0;
+}
+
+int p_delete(const char* param, void* place_to_save)
+{
+    if (mode_flag)
+    {
+        return 1;
+    }
+    mode = DELETE;
+    return 0;
+}
+
+int p_mark(const char* param, void* place_to_save)
+{
+    if (mode_flag)
+    {
+        return 1;
+    }
+    mode = MARK;
+    *static_cast<std::string*>(place_to_save) = param;
+    return 0;
+}
+
+int p_directory(const char* param, void* place_to_save)
+{
+    if (directory_flag)
+    {
+        return 1;
+    }
+    directory_flag = true;
+    path = param;
+    return 0;
+}
+
+int p_help(const char* param, void* place_to_save)
+{
+    if (mode_flag)
+    {
+        return 1;
+    }
+    mode = HELP;
+    return 0;
+}
+
+int p_verbose(const char* param, void* place_to_save)
+{
+    verbose_flag = true;
+    return 0;
+}
+
+int p_file(const char* param, void* place_to_save)
+{
+    file_path = param;
+    return 0;
+}
+
+
 int main(const int argc, const char** argv)
 {
     int result = EXIT_SUCCESS;
     std::string param;
     long id;
-    switch (parameter_processor(argc, argv, param, id))
+    const std::vector<struct option> options = {
+        {"check", 'c', false, p_check, nullptr},
+        {"delete", 'd', false, p_delete, nullptr},
+        {"mark", 'm', true, p_mark, &param},
+        {"help", 'h', false, p_help, nullptr},
+        {"directory", 'd', true, p_directory, nullptr},
+        {"verbose", 'v', false, p_verbose, nullptr},
+        {"file",'f',true,p_file,nullptr},
+    };
+
+    process(argc, argv, options);
+
+    switch (mode)
     {
     case ERROR:
         result = EXIT_FAILURE;
@@ -472,7 +552,8 @@ int main(const int argc, const char** argv)
         {
             break;
         }
-        if ((result = leave_text_in_terminal(param.c_str())) != EXIT_SUCCESS) {
+        if ((result = leave_text_in_terminal(param.c_str())) != EXIT_SUCCESS)
+        {
             error_messages.emplace_back(fmt::format("{}", param));
         }
         break;
@@ -492,7 +573,7 @@ int main(const int argc, const char** argv)
         {
             std::cout << error;
         }
+        std::cout << std::endl;
     }
-    std::cout << std::endl;
     return result;
 }
