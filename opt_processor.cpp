@@ -22,7 +22,7 @@ int process(const int argc, const char** argv, const std::vector<option>& option
                 result = 1;
                 for (auto & option : options)
                 {
-                    if (strcmp(argv[opt_index]+2,option.long_name.c_str()) == 0)
+                    if (option.long_name == argv[opt_index]+2)
                     {
                         if (option.has_arg)
                         {
