@@ -43,8 +43,8 @@ extra options:
 
 the program uses a few libraries that isn't STL:
 
-1. [fuzzy match](https://github.com/philj56/fuzzy-match) \(this project has contained its source for convinience\)
+1. [fuzzy match](https://github.com/philj56/fuzzy-match) \(this project has contained its source for convenience\)
 2. curses \(also known as ncurses\)
 3. fmt
 
-Besides, the program uses ioctl\(\) to write STDIN_FILENO (`ioctl(STDIN_FILENO, TIOCSTI, &c)`) to leave text in terminal for convinience. Note that on some modern Linux core this is disabled by default. I'm trying to change these code.
+Besides, the program uses ioctl\(\) to write STDIN_FILENO (`ioctl(STDIN_FILENO, TIOCSTI, &c)`) to leave text in terminal for convenience. Note that on some modern Linux core this is disabled by default. I'm trying to change these code.
