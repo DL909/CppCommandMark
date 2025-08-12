@@ -2,6 +2,13 @@
 // Created by 909 DL on 25-8-2.
 //
 
+/*
+ * Copyright (C) 2025 DL909 - This file has been modified from its original version.
+ *
+ * Licensed under the MIT License.
+ * https://opensource.org/licenses/MIT
+ */
+
 #include "opt_processor.h"
 
 int processor_error;

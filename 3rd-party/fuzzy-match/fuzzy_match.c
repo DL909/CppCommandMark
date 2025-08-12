@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2022 Philip Jones
+ * Copyright (C) 2025 DL909 - This file has been modified from its original version.
  *
  * Licensed under the MIT License.
  * https://opensource.org/licenses/MIT
@@ -11,11 +12,14 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "fuzzy_match.h"
 
 #undef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+struct node* match_end;
 
 static int32_t compute_score(
 		int32_t jump,
@@ -27,6 +31,8 @@ static int32_t fuzzy_match_recurse(
 		const char *restrict str,
 		int32_t score,
 		bool first_char);
+
+
 
 /*
  * Returns score if each character in pattern is found sequentially within str.
@@ -76,6 +82,7 @@ int32_t fuzzy_match_recurse(
 	}
 
 	const char *match = str;
+	int best_match = -1;
 	const char search[2] = { *pattern, '\0' };
 
 	int32_t best_score = INT32_MIN;
@@ -90,16 +97,46 @@ int32_t fuzzy_match_recurse(
 				match + 1,
 				compute_score(match - str, first_char, match),
 				false);
+		if (best_score < subscore)
+		{
+			best_score = subscore;
+			best_match = (match - str)/sizeof(*match);
+		}
 		best_score = MAX(best_score, subscore);
 		match++;
+	}
+	if (best_match>=0)
+	{
+		if (match_end == NULL)
+		{
+			match_end = malloc(sizeof(struct node));
+			match_end->number = best_match;
+			match_end->next = NULL;
+		}else
+		{
+			struct node * end = match_end;
+			match_end = malloc(sizeof(struct node));
+			match_end -> next = end;
+			match_end -> number = best_match;
+		}
 	}
 
 	if (best_score == INT32_MIN) {
 		/* We couldn't match the rest of the pattern. */
 		return INT32_MIN;
-	} else {
-		return score + best_score;
 	}
+	return score + best_score;
+}
+
+int recursive_delete(struct node* p)
+{
+	while (p != NULL)
+	{
+		struct node* next = p->next;
+		free(p);
+		p = next;
+	}
+	return 0;
 }
 
 /*

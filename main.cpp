@@ -2,8 +2,15 @@
 // Created by 909 DL on 2025/7/20.
 //
 
+/*
+ * Copyright (C) 2025 DL909 - This file has been modified from its original version.
+ *
+ * Licensed under the MIT License.
+ * https://opensource.org/licenses/MIT
+ */
+
 #include <iostream>
-#include <ncurses/ncurses.h>
+#include <ncurses.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <fstream>
@@ -14,6 +21,7 @@
 #include <filesystem>
 
 #include <fuzzy_match.h>
+#include <list>
 
 #include "opt_processor.h"
 
@@ -89,7 +97,10 @@ int mark(const std::string& command)
     std::cout << fmt::format("command = {}\nin path {}\n type y to agree\n", command, path);
     if (getchar() == 'y')
     {
-        const std::string file_path = static_cast<std::string>(getenv("HOME")) + "/.command_mark";
+        if (file_path.empty())
+        {
+            file_path = static_cast<std::string>(getenv("HOME")) + "/.command_mark";
+        }
         std::ofstream ofstream(file_path, std::ios::app);
         if (!ofstream.is_open())
         {
@@ -165,7 +176,6 @@ int delete_mark(long id)
 
 int help()
 {
-
     std::cout << "Cpp Command Mark" << std::endl;
     std::cout << "usage:" << std::endl;
     std::cout << "\t./CppCommandMark <option> [args]" << std::endl;
@@ -217,8 +227,51 @@ std::string operator*(const std::string& lhs, const int rhs)
     }
     return temp;
 }
+void bold_mvprintw(int line, int column, const std::string& text, int max_length, std::vector<int> list)
+{
+    move(line, column);
+    int index_of_list = 0;
+    if (text.length() > max_length)
+    {
+        for (int i = 0; i<max_length - 3; i++)
+        {
+            if (index_of_list < list.size() && list[index_of_list] == i)
+            {
+                attron(A_BOLD);
+                index_of_list ++;
+                addch(text[i]);
+                attroff(A_BOLD);
+            }else
+            {
+                addch(text[i]);
+            }
+        }
+        addch('.');
+        addch('.');
+        addch('.');
+    }else
+    {
+        for (int i = 0; i<text.length(); i++)
+        {
+            if (index_of_list < list.size() && list[index_of_list] == i)
+            {
+                attron(A_BOLD);
+                index_of_list ++;
+                addch(text[i]);
+                attroff(A_BOLD);
+            }else
+            {
+                addch(text[i]);
+            }
+        }
+        for (int i = text.length(); i <max_length; i++)
+        {
+            addch(' ');
+        }
+    }
+}
 
-inline void rend(const int line, const task& task, const bool choose)
+void rend(const int line, const task& task, const bool choose, const std::vector<int>& list = {})
 {
     mvprintw(line, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
     if (choose)
@@ -230,31 +283,8 @@ inline void rend(const int line, const task& task, const bool choose)
     const int command_start = 2 + (verbose_flag ? score_long : 0);
     const int path_start = command_cols + 10 + (verbose_flag ? score_long : 0);
     if (verbose_flag) { mvprintw(line, 2, "%ld", task.score); }
-    if (task.command.length() >= command_cols)
-    {
-        mvprintw(line, command_start, "%s...", task.command.substr(0, command_cols).c_str());
-    }
-    else
-    {
-        mvprintw(line, command_start, "%s", task.command.c_str());
-        for (int i = command_start + task.command.length(); i < command_start + command_cols; i++)
-        {
-            mvprintw(line, i, " ");
-        };
-    }
-    if (task.path.length() >= path_cols)
-    {
-        mvprintw(line, path_start, "...%s",
-                 task.path.substr(task.path.length() - path_cols + 3, path_cols - 3).c_str());
-    }
-    else
-    {
-        mvprintw(line, path_start, "%s", task.path.c_str());
-        for (int i = path_start + task.path.length(); i < path_start + path_cols; i++)
-        {
-            mvprintw(line, i, " ");
-        };
-    }
+    bold_mvprintw(line,command_start,task.command,command_cols,{0,3,7});
+    bold_mvprintw(line,path_start,task.path,path_cols,{0,3,7});
 }
 
 inline void sort_tasks(std::vector<task>& tasks)
