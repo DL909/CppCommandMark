@@ -9,8 +9,8 @@ the program uses cmake to build itself and uses vcpkg as its library manager. Ma
 than, in terminal, clone the project into a directory:
 
 ```
-cd CppCommandMark
-cmake --build ./cmake-build-debug --target CppCommandMark
+    cd CppCommandMark
+    cmake --build ./cmake-build-debug --target CppCommandMark
 ```
 
 if everything goes well, you will find the executable in cmake-build-debug
@@ -19,7 +19,7 @@ if everything goes well, you will find the executable in cmake-build-debug
 
 usage:
 ```
-	./CppCommandMark <option> [args]
+    ./CppCommandMark <option> [args] 
 ```
 Options:
 ```
@@ -48,6 +48,12 @@ the program uses a few libraries that isn't STL:
 3. fmt
 
 Besides, the program uses ioctl\(\) to write STDIN_FILENO (`ioctl(STDIN_FILENO, TIOCSTI, &c)`) to leave text in terminal for convenience. Note that on some modern Linux core this is disabled by default. I'm trying to change these code.
+
+In case you really want to use this feature right now, using this command to enable it.
+
+```
+    sudo sysctl -w dev.tty.legacy_tiocsti=1
+```
 
 ## plan of version 2
 

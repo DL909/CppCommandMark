@@ -16,15 +16,19 @@
 
 int main(const int argc, const char** argv)
 {
-    std::cout << fuzzy_match("tttt","?DL909/home/ttestesest") << std::endl;
-    const node * p = match_end;
-    int index = -1;
-    while (p != nullptr)
-    {
-        index += p->number + 1;
-        std::cout << index << std::endl;
-        p = p->next;
-    }
-    recursive_delete(match_end);
+    // std::cout << fuzzy_match("tttt","?DL909/home/ttestesest") << std::endl;
+    // const node * p = match_end;
+    // int index = -1;
+    // while (p != nullptr)
+    // {
+    //     index += p->number + 1;
+    //     std::cout << index << std::endl;
+    //     p = p->next;
+    // }
+    // recursive_delete(match_end);
+    std::cout << sizeof(int) << std::endl;
+    const int temp = 255;
+    const int * test = &temp;
+    std::cout << *test << std::endl;
     return 0;
 }

@@ -273,6 +273,9 @@ void bold_mvprintw(int line, int column, const std::string& text, int max_length
 
 void rend(const int line, const task& task, const bool choose, const std::vector<int>& list = {})
 {
+    if (choose) {
+        attron(A_REVERSE); // 开启反显
+    }
     mvprintw(line, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
     if (choose)
     {
@@ -285,6 +288,10 @@ void rend(const int line, const task& task, const bool choose, const std::vector
     if (verbose_flag) { mvprintw(line, 2, "%ld", task.score); }
     bold_mvprintw(line,command_start,task.command,command_cols,{0,3,7});
     bold_mvprintw(line,path_start,task.path,path_cols,{0,3,7});
+    if (choose)
+    {
+        attroff(A_REVERSE);
+    }
 }
 
 inline void sort_tasks(std::vector<task>& tasks)
@@ -340,9 +347,33 @@ int choose(std::string& command, long& id)
     std::string p_command;
     std::string p_path;
     setlocale(LC_ALL, "");
-    initscr();
-    raw();
-    keypad(stdscr, TRUE);
+
+    // 2. 为ncurses I/O打开/dev/tty
+    FILE* tty_fp_out = fopen("/dev/tty", "w");
+    FILE* tty_fp_in = fopen("/dev/tty", "r");
+
+    if (!tty_fp_out || !tty_fp_in) {
+        std::cerr << "Error: Could not open /dev/tty" << std::endl;
+        return 1;
+    }
+
+    // 3. 使用newterm()初始化ncurses
+    // newterm的第一个参数为NULL，它会从TERM环境变量自动检测终端类型
+    SCREEN* term_screen = newterm(nullptr, tty_fp_out, tty_fp_in);
+    if (term_screen == nullptr) {
+        std::cerr << "Error: newterm() failed" << std::endl;
+        fclose(tty_fp_out);
+        fclose(tty_fp_in);
+        return 1;
+    }
+
+    // 设置当前活动的ncurses屏幕
+    set_term(term_screen);
+
+    // 4. 设置ncurses模式
+    noecho();             // 不回显用户输入
+    cbreak();             // 立即获取字符，无需等待回车
+    keypad(stdscr, TRUE); // 启用功能键 (如箭头)
     curs_set(0);
     bool continue_flag = true;
     noecho();
