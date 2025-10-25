@@ -39,7 +39,7 @@ extra options:
  
 	--file(-f): manually choose where the information file is
   
-  --wait(-w): pause program until enter ( for debugging )
+  	--wait(-w): pause program until enter ( for debugging )
 ```
 ## Details
 
