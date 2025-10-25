@@ -29,7 +29,7 @@ int process(const int argc, const char** argv, const std::vector<option>& option
                 result = 1;
                 for (auto & option : options)
                 {
-                    if (option.long_name == argv[opt_index]+2)
+                    if (!option.long_name.empty() && option.long_name == argv[opt_index]+2)
                     {
                         if (option.has_arg)
                         {
@@ -76,7 +76,7 @@ int process(const int argc, const char** argv, const std::vector<option>& option
                     result = 1;
                     for (auto & option : options)
                     {
-                        if (short_arg == option.short_name)
+                        if (option.short_name != 0 && short_arg == option.short_name)
                         {
                             if (option.has_arg)
                             {
@@ -102,7 +102,7 @@ int process(const int argc, const char** argv, const std::vector<option>& option
                             }
                             result = 0;
                             opt_index_of_current++;
-                            arg_index++;
+                            // arg_index++;
                             break;
                         }
                     }

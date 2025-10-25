@@ -30,7 +30,8 @@ static int32_t fuzzy_match_recurse(
 		const char *restrict pattern,
 		const char *restrict str,
 		int32_t score,
-		bool first_char);
+		bool first_char,
+		struct node * * list);
 
 
 
@@ -43,6 +44,7 @@ int32_t fuzzy_match(const char *__restrict pattern, const char *__restrict str)
 	const int unmatched_letter_penalty = -1;
 	const size_t slen = strlen(str);
 	const size_t plen = strlen(pattern);
+    match_end = NULL;
 	int32_t score = 100;
 
 	if (*pattern == '\0') {
@@ -55,8 +57,12 @@ int32_t fuzzy_match(const char *__restrict pattern, const char *__restrict str)
 	/* We can already penalise any unused letters. */
 	score += unmatched_letter_penalty * (int32_t)(slen - plen);
 
+    recursive_delete(match_end);
+
+    match_end = NULL;
+
 	/* Perform the match. */
-	score = fuzzy_match_recurse(pattern, str, score, true);
+	score = fuzzy_match_recurse(pattern, str, score, true, &match_end);
 
 	return score;
 }
@@ -74,7 +80,8 @@ int32_t fuzzy_match_recurse(
 		const char *restrict pattern,
 		const char *restrict str,
 		int32_t score,
-		bool first_char)
+		bool first_char,
+		struct node * * list)
 {
 	if (*pattern == '\0') {
 		/* We've matched the full pattern. */
@@ -86,41 +93,48 @@ int32_t fuzzy_match_recurse(
 	const char search[2] = { *pattern, '\0' };
 
 	int32_t best_score = INT32_MIN;
+    if (*list == NULL)
+    {
+        *list = malloc(sizeof(struct node));
+        (*list)->next = NULL;
+        (*list)->number = 0;
+    }else
+    {
+        (*list)->next = malloc(sizeof(struct node));
+        (*list)->next->next = NULL;
+        (*list)->next->number = 0;
+    }
+
+    struct node * temp = NULL;
 
 	/*
 	 * Find all occurrences of the next pattern character in str, and
 	 * recurse on them.
 	 */
 	while ((match = strcasestr(match, search)) != NULL) {
+
 		int32_t subscore = fuzzy_match_recurse(
 				pattern + 1,
 				match + 1,
 				compute_score(match - str, first_char, match),
-				false);
+				false,
+				&temp);
 		if (best_score < subscore)
 		{
 			best_score = subscore;
 			best_match = (match - str)/sizeof(*match);
+		    recursive_delete((*list)->next);
+            (*list)->next = temp;
+		    (*list)->number = best_match;
+		    temp = NULL;
+		}else
+		{
+		    recursive_delete(temp);
+		    temp = NULL;
 		}
 		best_score = MAX(best_score, subscore);
 		match++;
 	}
-	if (best_match>=0)
-	{
-		if (match_end == NULL)
-		{
-			match_end = malloc(sizeof(struct node));
-			match_end->number = best_match;
-			match_end->next = NULL;
-		}else
-		{
-			struct node * end = match_end;
-			match_end = malloc(sizeof(struct node));
-			match_end -> next = end;
-			match_end -> number = best_match;
-		}
-	}
-
 	if (best_score == INT32_MIN) {
 		/* We couldn't match the rest of the pattern. */
 		return INT32_MIN;
@@ -128,6 +142,7 @@ int32_t fuzzy_match_recurse(
 	return score + best_score;
 }
 
+// ReSharper disable once CppDFAConstantFunctionResult
 int recursive_delete(struct node* p)
 {
 	while (p != NULL)

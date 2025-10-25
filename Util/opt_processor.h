@@ -7,8 +7,7 @@
  * Licensed under the MIT License.
  * https://opensource.org/licenses/MIT
  */
-#ifndef OPT_PROCESSOR_H
-#define OPT_PROCESSOR_H
+#pragma once
 #include <string>
 #include <vector>
 
@@ -45,4 +44,3 @@ struct option
 
 int process(int argc, const char** argv, const std::vector<option>& options);
 
-#endif //OPT_PROCESSOR_H

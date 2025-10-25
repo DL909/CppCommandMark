@@ -38,6 +38,8 @@ extra options:
 	--verbose(-v): show verbose output
  
 	--file(-f): manually choose where the information file is
+	
+	--wait(-w): pause program until enter ( for debugging )
 ```
 ## Details
 
@@ -54,11 +56,6 @@ In case you really want to use this feature right now, using this command to ena
 ```
     sudo sysctl -w dev.tty.legacy_tiocsti=1
 ```
-
-## plan of version 2
-
-- highlight of matched characters
-- more acceptable way to leave text in terminal
 
 ## plan of future
 
