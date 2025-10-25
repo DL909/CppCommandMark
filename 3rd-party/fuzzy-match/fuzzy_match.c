@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2022 Philip Jones
+ * Copyright (C) 2025 DL909 - This file has been modified from its original version.
  *
  * Licensed under the MIT License.
  * https://opensource.org/licenses/MIT
@@ -11,11 +12,14 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "fuzzy_match.h"
 
 #undef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+struct node* match_end;
 
 static int32_t compute_score(
 		int32_t jump,
@@ -26,7 +30,10 @@ static int32_t fuzzy_match_recurse(
 		const char *restrict pattern,
 		const char *restrict str,
 		int32_t score,
-		bool first_char);
+		bool first_char,
+		struct node * * list);
+
+
 
 /*
  * Returns score if each character in pattern is found sequentially within str.
@@ -37,6 +44,7 @@ int32_t fuzzy_match(const char *__restrict pattern, const char *__restrict str)
 	const int unmatched_letter_penalty = -1;
 	const size_t slen = strlen(str);
 	const size_t plen = strlen(pattern);
+    match_end = NULL;
 	int32_t score = 100;
 
 	if (*pattern == '\0') {
@@ -49,8 +57,12 @@ int32_t fuzzy_match(const char *__restrict pattern, const char *__restrict str)
 	/* We can already penalise any unused letters. */
 	score += unmatched_letter_penalty * (int32_t)(slen - plen);
 
+    recursive_delete(match_end);
+
+    match_end = NULL;
+
 	/* Perform the match. */
-	score = fuzzy_match_recurse(pattern, str, score, true);
+	score = fuzzy_match_recurse(pattern, str, score, true, &match_end);
 
 	return score;
 }
@@ -68,7 +80,8 @@ int32_t fuzzy_match_recurse(
 		const char *restrict pattern,
 		const char *restrict str,
 		int32_t score,
-		bool first_char)
+		bool first_char,
+		struct node * * list)
 {
 	if (*pattern == '\0') {
 		/* We've matched the full pattern. */
@@ -76,30 +89,69 @@ int32_t fuzzy_match_recurse(
 	}
 
 	const char *match = str;
+	int best_match = -1;
 	const char search[2] = { *pattern, '\0' };
 
 	int32_t best_score = INT32_MIN;
+    if (*list == NULL)
+    {
+        *list = malloc(sizeof(struct node));
+        (*list)->next = NULL;
+        (*list)->number = 0;
+    }else
+    {
+        (*list)->next = malloc(sizeof(struct node));
+        (*list)->next->next = NULL;
+        (*list)->next->number = 0;
+    }
+
+    struct node * temp = NULL;
 
 	/*
 	 * Find all occurrences of the next pattern character in str, and
 	 * recurse on them.
 	 */
 	while ((match = strcasestr(match, search)) != NULL) {
+
 		int32_t subscore = fuzzy_match_recurse(
 				pattern + 1,
 				match + 1,
 				compute_score(match - str, first_char, match),
-				false);
+				false,
+				&temp);
+		if (best_score < subscore)
+		{
+			best_score = subscore;
+			best_match = (match - str)/sizeof(*match);
+		    recursive_delete((*list)->next);
+            (*list)->next = temp;
+		    (*list)->number = best_match;
+		    temp = NULL;
+		}else
+		{
+		    recursive_delete(temp);
+		    temp = NULL;
+		}
 		best_score = MAX(best_score, subscore);
 		match++;
 	}
-
 	if (best_score == INT32_MIN) {
 		/* We couldn't match the rest of the pattern. */
 		return INT32_MIN;
-	} else {
-		return score + best_score;
 	}
+	return score + best_score;
+}
+
+// ReSharper disable once CppDFAConstantFunctionResult
+int recursive_delete(struct node* p)
+{
+	while (p != NULL)
+	{
+		struct node* next = p->next;
+		free(p);
+		p = next;
+	}
+	return 0;
 }
 
 /*

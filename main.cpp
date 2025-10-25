@@ -2,8 +2,15 @@
 // Created by 909 DL on 2025/7/20.
 //
 
+/*
+ * Copyright (C) 2025 DL909 - This file has been modified from its original version.
+ *
+ * Licensed under the MIT License.
+ * https://opensource.org/licenses/MIT
+ */
+
 #include <iostream>
-#include <ncurses/ncurses.h>
+#include <ncurses.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <fstream>
@@ -11,28 +18,21 @@
 #include <fmt/format.h>
 #include <algorithm>
 #include <cstdlib>
-#include <filesystem>
+#include <pugixml.hpp>
+#include <memory>
+#include <list>
 
-#include <fuzzy_match.h>
+#include "fuzzy_match.h"
+#include "Util/opt_processor.h"
+#include "Tasks/Task.h"
+#include "Util/util.h"
 
-#include "opt_processor.h"
 
+#include "Util/config_and_constants.h"
 
-constexpr int score_long = 20;
-std::vector<std::string> error_messages;
-
-enum RESPONSE_MODE
-{
-    COMMAND = 0,
-    TEXT = 1,
-};
 
 // parameter flag
-bool verbose_flag = false;
-bool directory_flag = false; // given directory rather than using current directory
-std::string path;
-std::string file_path;
-RESPONSE_MODE response_mode = COMMAND;
+
 
 enum MODE
 {
@@ -43,301 +43,87 @@ enum MODE
     HELP = 4,
 };
 
+std::vector<int> used_index{};
 
-class task
+struct scored_task_type
 {
-public:
-    int index;
-    std::string command;
-    std::string path;
-    long score;
-
-
-    task(const int index_, const std::string& command_, const std::string& path_)
-    {
-        index = index_;
-        command = command_;
-        path = path_;
-        score = 200;
-    }
+    std::string name;
+    int score = 100;
 };
 
-std::string get_path()
+inline void sort_scored_types(std::vector<scored_task_type> & types)
 {
-    try
-    {
-        return std::filesystem::current_path().string();
-    }
-    catch (const std::filesystem::filesystem_error& e)
-    {
-        error_messages.emplace_back(fmt::format("get_path() error: {}\n", e.what()));
-        return "";
-    }
-}
-
-int mark(const std::string& command)
-{
-    if (!directory_flag)
-    {
-        path = get_path();
-    }
-    if (path.empty())
-    {
-        error_messages.emplace_back("mark() error: can't get path\n");
-        return EXIT_FAILURE;
-    }
-    std::cout << fmt::format("command = {}\nin path {}\n type y to agree\n", command, path);
-    if (getchar() == 'y')
-    {
-        const std::string file_path = static_cast<std::string>(getenv("HOME")) + "/.command_mark";
-        std::ofstream ofstream(file_path, std::ios::app);
-        if (!ofstream.is_open())
-        {
-            error_messages.emplace_back(fmt::format("mark() error: could not open file {}\n", file_path));
-            return EXIT_FAILURE;
-        }
-        ofstream << command << std::endl << path << std::endl;
-        ofstream.close();
-        std::cout << "marked command: \n" << command << std::endl << "in directory: \n" << path << std::endl;
-        return EXIT_SUCCESS;
-    }
-    error_messages.emplace_back("mark() error: user interrupted");
-    return EXIT_FAILURE;
-}
-
-int delete_mark(long id)
-{
-    int result = EXIT_SUCCESS;
-    if (file_path.empty())
-    {
-        file_path = static_cast<std::string>(getenv("HOME")) + "/.command_mark";
-    }
-    const std::string bak_file_path = file_path + ".bak";
-    if (access(bak_file_path.c_str(),F_OK) == 0)
-    {
-        if (remove(bak_file_path.c_str()) != 0)
-        {
-            error_messages.emplace_back(fmt::format("mark() error: could not remove file {}\n", bak_file_path));
-            result = EXIT_FAILURE;
-            return result;
-        }
-    }
-    if (rename(file_path.c_str(), bak_file_path.c_str()) != 0)
-    {
-        error_messages.emplace_back(fmt::format("mark() error: could not rename file {}\n", file_path));
-        result = EXIT_FAILURE;
-        return result;
-    }
-    std::ifstream old_file(bak_file_path);
-    if (!old_file.is_open())
-    {
-        error_messages.emplace_back(fmt::format("mark() error: could not open file {}\n", bak_file_path));
-        result = EXIT_FAILURE;
-        return result;
-    }
-    std::ofstream new_file(file_path);
-    if (!new_file.is_open())
-    {
-        error_messages.emplace_back(fmt::format("mark() error: could not open file {}\n", file_path));
-        result = EXIT_FAILURE;
-        return result;
-    }
-    std::string temp;
-    std::string deleted_line1;
-    std::string deleted_line2;
-    int index = 0;
-    while (index < id * 2)
-    {
-        std::getline(old_file, temp);
-        new_file << temp << std::endl;
-        index++;
-    }
-    std::getline(old_file, deleted_line1);
-    std::getline(old_file, deleted_line2);
-    std::getline(old_file, temp);
-    while (!temp.empty())
-    {
-        new_file << temp << std::endl;
-        std::getline(old_file, temp);
-    }
-    return result;
-}
-
-int help()
-{
-
-    std::cout << "Cpp Command Mark" << std::endl;
-    std::cout << "usage:" << std::endl;
-    std::cout << "\t./CppCommandMark <option> [args]" << std::endl;
-    std::cout << std::endl;
-    std::cout << "Options:" << std::endl;
-    std::cout << "\t--help(-h): show this help" << std::endl;
-    std::cout << "\t--check(-c): choose command and use ( default )" << std::endl;
-    std::cout << "\t--delete(-d): choose command and delete" << std::endl;
-    std::cout << "\t--mark(-x): mark command" << std::endl;
-    std::cout << "\t\t--directory(-d): manually choose where the command will run" << std::endl;
-    std::cout << "extra options:" << std::endl;
-    std::cout << "\t--verbose(-v): show verbose output" << std::endl;
-    std::cout << "\t--file(-f): manually choose where the information file is" << std::endl;
-
-    return EXIT_SUCCESS;
-}
-
-std::vector<task> get_task_list()
-{
-    if (file_path.empty())
-    {
-        file_path = static_cast<std::string>(getenv("HOME")) + "/.command_mark";
-    }
-    std::ifstream ifstream;
-    ifstream.open(file_path);
-    if (!ifstream.is_open())
-    {
-        error_messages.emplace_back("get_task_list() error: could not open file \n");
-        return {};
-    }
-    std::vector<task> command_list;
-    std::string temp1;
-    std::string temp2;
-    int i = 0;
-    while (std::getline(ifstream, temp1) && std::getline(ifstream, temp2))
-    {
-        command_list.emplace_back(i, temp1, temp2);
-        i++;
-    }
-    return command_list;
-}
-
-std::string operator*(const std::string& lhs, const int rhs)
-{
-    std::string temp;
-    for (int i = 0; i < rhs; i++)
-    {
-        temp += lhs;
-    }
-    return temp;
-}
-
-inline void rend(const int line, const task& task, const bool choose)
-{
-    mvprintw(line, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
-    if (choose)
-    {
-        mvprintw(line, 0, "* ");
-    }
-    const int path_cols = ((COLS - 6) - (COLS - 6) % 3) / 3;
-    const int command_cols = COLS - 6 - path_cols - 4 - (verbose_flag ? score_long : 0);
-    const int command_start = 2 + (verbose_flag ? score_long : 0);
-    const int path_start = command_cols + 10 + (verbose_flag ? score_long : 0);
-    if (verbose_flag) { mvprintw(line, 2, "%ld", task.score); }
-    if (task.command.length() >= command_cols)
-    {
-        mvprintw(line, command_start, "%s...", task.command.substr(0, command_cols).c_str());
-    }
-    else
-    {
-        mvprintw(line, command_start, "%s", task.command.c_str());
-        for (int i = command_start + task.command.length(); i < command_start + command_cols; i++)
-        {
-            mvprintw(line, i, " ");
-        };
-    }
-    if (task.path.length() >= path_cols)
-    {
-        mvprintw(line, path_start, "...%s",
-                 task.path.substr(task.path.length() - path_cols + 3, path_cols - 3).c_str());
-    }
-    else
-    {
-        mvprintw(line, path_start, "%s", task.path.c_str());
-        for (int i = path_start + task.path.length(); i < path_start + path_cols; i++)
-        {
-            mvprintw(line, i, " ");
-        };
-    }
-}
-
-inline void sort_tasks(std::vector<task>& tasks)
-{
-    std::ranges::sort(tasks, [](const task& a, const task& b)
-    {
-        return a.score == b.score ? a.index > b.index : a.score > b.score;
+    std::ranges::sort(types, [](const scored_task_type & a, const scored_task_type & b) {
+        return a.score > b.score;
     });
 }
-
-void calculate_pattern(const std::string& input, std::string& p_command, std::string& p_path)
+int mark(const std::string& command)
 {
-    bool command_flag = true;
-    bool backslash_flag = false;
-    p_command = "";
-    p_path = "";
-    for (char c : input)
+
+    std::vector<scored_task_type> types;
+    for (const auto& name : UserTaskFactory::get_user_create_task_type_list())
     {
-        if (!backslash_flag)
-        {
-            backslash_flag = false;
-            if (c == '\\')
-            {
-                backslash_flag = true;
-                continue;
-            }
-            if (c == ' ' and command_flag)
-            {
-                command_flag = false;
-                continue;
-            }
-        }
-        if (command_flag)
-        {
-            p_command += c;
-        }
-        else
-        {
-            p_path += c;
-        }
+        types.emplace_back(name);
     }
-}
-
-int choose(std::string& command, long& id)
-{
-    int result = EXIT_SUCCESS;
-    std::vector<task> tasks = get_task_list();
-    if (tasks.empty())
+    if (types.empty())
     {
-        error_messages.emplace_back("choose() error: get_task_list() failed");
+        error_messages.emplace_back("Error: no valid task type");
+        return EXIT_FAILURE;
+    }
+
+    setlocale(LC_ALL, "");
+
+    // 2. 为ncurses I/O打开/dev/tty
+    FILE* tty_fp_out = fopen("/dev/tty", "w");
+    FILE* tty_fp_in = fopen("/dev/tty", "r");
+
+    if (!tty_fp_out || !tty_fp_in) {
+        std::cerr << "Error: Could not open /dev/tty" << std::endl;
         return -1;
     }
-    std::string p_command;
-    std::string p_path;
-    setlocale(LC_ALL, "");
-    initscr();
-    raw();
-    keypad(stdscr, TRUE);
-    curs_set(0);
-    bool continue_flag = true;
-    noecho();
+
+    // 3. 使用newterm()初始化ncurses
+    // newterm的第一个参数为NULL，它会从TERM环境变量自动检测终端类型
+    SCREEN* term_screen = newterm(nullptr, tty_fp_out, tty_fp_in);
+    if (term_screen == nullptr) {
+        std::cerr << "Error: newterm() failed" << std::endl;
+        fclose(tty_fp_out);
+        fclose(tty_fp_in);
+        return -1;
+    }
+
+    // 设置当前活动的ncurses屏幕
+    set_term(term_screen);
+    // 4. 设置ncurses模式
+    noecho();             // 不回显用户输入
+    cbreak();             // 立即获取字符，无需等待回车
+    keypad(stdscr, TRUE); // 启用功能键 (如箭头)
     curs_set(1);
+
+
     int choice = 0;
-    const int number = std::min(LINES - 3 - (verbose_flag ? 3 : 0), static_cast<int>(tasks.size()) - 1);
-    int index = 0;
+    const int number = std::min(LINES - 3 - (config.verbose_flag ? 1 : 0), static_cast<int>(types.size()) - 1);
     std::string input;
-    sort_tasks(tasks);
-    for (int i = 0; i < std::min(LINES - 2, static_cast<int>(tasks.size())); i++)
-    {
-        rend(LINES - 2 - i, tasks[i], choice == i);
-    }
-    if (verbose_flag)
-    {
-        mvprintw(0, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
-        mvprintw(1, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
-        mvprintw(2, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
-        mvprintw(0, 0, "command : %s", p_command.c_str());
-        mvprintw(1, 0, "path    : %s", p_path.c_str());
-        mvprintw(2, 0, "choice  : %d", choice);
-    }
+    int index=0;
+    int result = EXIT_SUCCESS;
+    bool continue_flag = true;
+
     mvprintw(LINES - 1, 0, "> ");
     while (continue_flag)
     {
+        if (config.verbose_flag)
+        {
+            mvprintw(0, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
+            mvprintw(0, 0, "choice  : %d", choice);
+        }
+        int i = 0;
+        for (const auto & type  : types)
+        {
+            mvprintw(LINES - 2 - i, 0, "%c %s", choice == i?'*' : ' ',type.name.c_str());
+        }
+        mvprintw(LINES - 1, 2, "%s", (static_cast<std::string>(" ") * (COLS - 2)).c_str());
+        mvprintw(LINES - 1, 2, "%s", input.c_str());
+        mvprintw(LINES - 1, index + 2, "");
         switch (const int c = getch())
         {
         case KEY_UP:
@@ -353,7 +139,8 @@ int choose(std::string& command, long& id)
             index = std::min(index + 1, static_cast<int>(input.length()));
             break;
         case 3: // ctrl + c
-            error_messages.emplace_back("choose() error: interrupted\n");
+        case 27: // esc
+            error_messages.emplace_back("Error: interrupted");
             result = EXIT_FAILURE;
             continue_flag = false;
             continue;
@@ -384,72 +171,248 @@ int choose(std::string& command, long& id)
                     }
                 }
             }
-
-
-            calculate_pattern(input, p_command, p_path);
-
-            for (auto& task : tasks)
+            for (auto & [name, score] : types)
             {
-                const int command_score = fuzzy_match(p_command.c_str(), task.command.c_str());
-                const int path_score = fuzzy_match(p_path.c_str(), task.path.c_str());
-                if (command_score == INT32_MIN || path_score == INT32_MIN)
-                {
-                    task.score = INT32_MIN;
-                }
-                else
-                {
-                    task.score = command_score + path_score;
-                }
+                score = fuzzy_match(input.c_str(), name.c_str());
             }
-            sort_tasks(tasks);
-
-
+            sort_scored_types(types);
             break;
         }
-        if (verbose_flag)
+
+    }
+
+    echo();
+    endwin();
+    fclose(tty_fp_out);
+    fclose(tty_fp_in);
+    if (result != EXIT_SUCCESS)
+    {
+        return result;
+    }
+    pugi::xml_document doc;
+    doc.load_file(config.file_path.c_str());
+    pugi::xml_node root = doc.child("root");
+    if (root.empty())
+    {
+        root = doc.append_child("root");
+    }
+    if (UserTaskFactory::create(types[choice].name,root.last_child().child("index").text().as_int()+1, root) == EXIT_SUCCESS)
+    {
+        std::cout << "successfully added task" << std::endl;
+        return EXIT_SUCCESS;
+    }
+    std::cerr << "failed to add task" << std::endl;
+    return EXIT_FAILURE;
+}
+
+int delete_mark(const long id)
+{
+    pugi::xml_document doc;
+    doc.load_file(config.file_path.c_str());
+    pugi::xml_node root = doc.child("root");
+    if (root.empty())
+    {
+        std::cerr << "failed to load xml" << std::endl;
+        return EXIT_FAILURE;
+    }
+    pugi::xml_node current_task = root.child("task");
+
+    while (current_task)
+    {
+        pugi::xml_node next_task = current_task.next_sibling("task");
+        if (current_task.child("index").text().as_int() == id)
+        {
+            root.remove_child(current_task);
+        }
+        current_task = next_task;
+    }
+    return doc.save_file(config.file_path.c_str());
+}
+
+int help()
+{
+    std::cout << "Cpp Command Mark" << std::endl;
+    std::cout << "usage:" << std::endl;
+    std::cout << "\t./CppCommandMark <option> [args]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "\t--help(-h): show this help" << std::endl;
+    std::cout << "\t--check(-c): choose command and use ( default )" << std::endl;
+    std::cout << "\t--delete(-d): choose command and delete" << std::endl;
+    std::cout << "\t--mark(-x): mark command" << std::endl;
+    std::cout << "\t\t--directory(-d): manually choose where the command will run" << std::endl;
+    std::cout << "extra options:" << std::endl;
+    std::cout << "\t--verbose(-v): show verbose output" << std::endl;
+    std::cout << "\t--file(-f): manually choose where the information file is" << std::endl;
+    std::cout << "\t--wait(-w): pause program until enter ( for debugging )" << std::endl;
+
+    return EXIT_SUCCESS;
+}
+
+std::vector<std::unique_ptr<Task>> get_task_list()
+{
+    std::vector<std::unique_ptr<Task>> task_list;
+
+    pugi::xml_document doc;
+    if (!doc.load_file(config.file_path.c_str()))
+    {
+        error_messages.emplace_back(fmt::format("get_task_list() error: could not load xml document from {}\n",config.file_path));
+    }
+
+    for (pugi::xml_node node : doc.child("root").children())
+    {
+        std::string name = node.child("type").text().as_string();
+        int index = node.child("index").text().as_int();
+        task_list.push_back(TaskFactory::create(name,index, node.child("data")));
+        used_index.push_back(index);
+    }
+
+    return task_list;
+}
+
+inline void sort_tasks(std::vector<std::unique_ptr<Task>>& tasks)
+{
+    std::ranges::sort(tasks, [](const std::unique_ptr<Task>& a, const std::unique_ptr<Task>& b) {
+        return a->score == b->score ? a->index > b->index : a->score > b->score;
+    });
+}
+
+int choose(std::string& command, long& id)
+{
+    std::vector<std::unique_ptr<Task>> tasks = get_task_list();
+    if (tasks.empty())
+    {
+        error_messages.emplace_back("choose() error: get_task_list() failed");
+        return -1;
+    }
+
+
+
+    setlocale(LC_ALL, "");
+
+    // 2. 为ncurses I/O打开/dev/tty
+    FILE* tty_fp_out = fopen("/dev/tty", "w");
+    FILE* tty_fp_in = fopen("/dev/tty", "r");
+
+    if (!tty_fp_out || !tty_fp_in) {
+        std::cerr << "Error: Could not open /dev/tty" << std::endl;
+        return -1;
+    }
+
+    // 3. 使用newterm()初始化ncurses
+    // newterm的第一个参数为NULL，它会从TERM环境变量自动检测终端类型
+    SCREEN* term_screen = newterm(nullptr, tty_fp_out, tty_fp_in);
+    if (term_screen == nullptr) {
+        std::cerr << "Error: newterm() failed" << std::endl;
+        fclose(tty_fp_out);
+        fclose(tty_fp_in);
+        return -1;
+    }
+
+    // 设置当前活动的ncurses屏幕
+    set_term(term_screen);
+    // 4. 设置ncurses模式
+    noecho();             // 不回显用户输入
+    cbreak();             // 立即获取字符，无需等待回车
+    keypad(stdscr, TRUE); // 启用功能键 (如箭头)
+    curs_set(1);
+
+
+    int choice = 0;
+    const int number = std::min(LINES - 3 - (config.verbose_flag ? 1 : 0), static_cast<int>(tasks.size()) - 1);
+    std::string input;
+    int index=0;
+    int result = EXIT_SUCCESS;
+    bool continue_flag = true;
+
+    mvprintw(LINES - 1, 0, "> ");
+    sort_tasks(tasks);
+    while (continue_flag)
+    {
+
+        if (config.verbose_flag)
         {
             mvprintw(0, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
-            mvprintw(1, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
-            mvprintw(2, 0, "%s", (static_cast<std::string>(" ") * COLS).c_str());
-            mvprintw(0, 0, "command : %s", p_command.c_str());
-            mvprintw(1, 0, "path    : %s", p_path.c_str());
-            mvprintw(2, 0, "choice  : %d", choice);
+            mvprintw(0, 0, "choice  : %d", choice);
         }
-        for (int i = 0; i <= number; i++)
+        int task_index = 0;
+        int i = LINES - 2;
+        for (const auto & task  : tasks)
         {
-            rend(LINES - 2 - i, tasks[i], i == choice);
+            if (i<(config.verbose_flag?1:0))
+            {
+                break;
+            }
+            i = i - task->rend(i,choice == task_index);
+            task_index ++;
         }
         mvprintw(LINES - 1, 2, "%s", (static_cast<std::string>(" ") * (COLS - 2)).c_str());
         mvprintw(LINES - 1, 2, "%s", input.c_str());
-        //mvcur(LINES -1,LINES-1,index+2,index+2);
         mvprintw(LINES - 1, index + 2, "");
-    }
-
-    echo();
-    endwin();
-    command = fmt::format("cd \"{}\";{}", tasks[choice].path, tasks[choice].command);
-    id = tasks[choice].index;
-    return result;
-}
-
-int leave_text_in_terminal(const char* text_to_leave)
-{
-    initscr();
-    noecho(); //阻止输出
-    // 遍历需要留下的字符串中的每一个字符
-    for (int i = 0; i < strlen(text_to_leave); ++i)
-    {
-        char c = text_to_leave[i];
-        int t = ioctl(STDIN_FILENO, TIOCSTI, &c);
-        if (t < 0)
+        switch (const int c = getch())
         {
-            error_messages.emplace_back(fmt::format("leave_text_in_terminal() error: ioctl() failed : {}\n",errno));
-            return EXIT_FAILURE;
+        case KEY_UP:
+            choice = std::min(choice + 1, number);
+            break;
+        case KEY_DOWN:
+            choice = std::max(choice - 1, 0);
+            break;
+        case KEY_LEFT:
+            index = std::max(index - 1, 0);
+            break;
+        case KEY_RIGHT:
+            index = std::min(index + 1, static_cast<int>(input.length()));
+            break;
+        case 3: // ctrl + c
+        case 27: // esc
+            error_messages.emplace_back(fmt::format("choose() error: interrupted\n"));
+            result = EXIT_FAILURE;
+            continue_flag = false;
+            continue;
+        case '\n':
+            continue_flag = false;
+            continue;
+        default:
+            {
+                if (c <= 31) // control ascii
+                {
+                    continue;
+                }
+                if (c <= 126)
+                {
+                    input.insert(index, std::string(1, static_cast<char>(c)));
+                    index++;
+                }
+                else if (c == 127 || c == KEY_BACKSPACE)
+                {
+                    if (index > 0)
+                    {
+                        input.erase(index - 1, 1);
+                        index--;
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+            }
+            for (const auto & task  : tasks)
+            {
+                task->update_score(input);
+            }
+            sort_tasks(tasks);
+            break;
         }
+
     }
+
     echo();
     endwin();
-    return EXIT_SUCCESS;
+    command = tasks[choice]->get_output();
+    id = tasks[choice]->index;
+    fclose(tty_fp_out);
+    fclose(tty_fp_in);
+    return result;
 }
 
 // parameter processer function
@@ -485,18 +448,17 @@ int p_mark(const char* param, void* place_to_save)
         return 1;
     }
     mode = MARK;
-    *static_cast<std::string*>(place_to_save) = param;
     return 0;
 }
 
 int p_directory(const char* param, void* place_to_save)
 {
-    if (directory_flag)
+    if (config.directory_flag)
     {
         return 1;
     }
-    directory_flag = true;
-    path = param;
+    config.directory_flag = true;
+    config.path = param;
     return 0;
 }
 
@@ -512,16 +474,21 @@ int p_help(const char* param, void* place_to_save)
 
 int p_verbose(const char* param, void* place_to_save)
 {
-    verbose_flag = true;
+    config.verbose_flag = true;
     return 0;
 }
 
 int p_file(const char* param, void* place_to_save)
 {
-    file_path = param;
+    config.file_path = param;
     return 0;
 }
 
+int p_wait(const char* param, void* place_to_save)
+{
+    config.wait_flag = true;
+    return 0;
+}
 
 int main(const int argc, const char** argv)
 {
@@ -531,14 +498,25 @@ int main(const int argc, const char** argv)
     const std::vector<struct option> options = {
         {"check", 'c', false, p_check, nullptr},
         {"delete", 'd', false, p_delete, nullptr},
-        {"mark", 'm', true, p_mark, &param},
+        {"mark", 'm', false, p_mark, nullptr},
         {"help", 'h', false, p_help, nullptr},
-        {"directory", 'd', true, p_directory, nullptr},
+        {"directory", '\0', true, p_directory, nullptr},
         {"verbose", 'v', false, p_verbose, nullptr},
         {"file",'f',true,p_file,nullptr},
+        {"wait",'w',false,p_wait,nullptr}
     };
 
-    process(argc, argv, options);
+    if (process(argc, argv, options)!=0)
+    {
+        std::cout << "process arg error" << std::endl;
+        return EXIT_FAILURE;
+    };
+
+    if (config.wait_flag)
+    {
+        std::cout << getpid() << std::endl;
+        getchar();
+    }
 
     switch (mode)
     {

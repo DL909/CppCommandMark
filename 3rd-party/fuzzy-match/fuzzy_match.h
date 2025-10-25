@@ -5,12 +5,20 @@
 
 #ifdef __cplusplus
 extern "C" {
+
 #endif
-int32_t fuzzy_match(const char * pattern, const char * str);
+struct node
+{
+    int number;
+    struct node* next;
+};
+
+extern struct node* match_end;
+int32_t fuzzy_match(const char* pattern, const char* str);
+int recursive_delete(struct node* p);
 #ifdef __cplusplus
 }
 #endif
-
 
 
 #endif /* FUZZY_MATCH_H */

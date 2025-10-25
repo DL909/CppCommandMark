@@ -1,9 +1,13 @@
 //
 // Created by 909 DL on 25-8-2.
 //
-
-#ifndef OPT_PROCESSOR_H
-#define OPT_PROCESSOR_H
+/*
+ * Copyright (C) 2025 DL909 - This file has been modified from its original version.
+ *
+ * Licensed under the MIT License.
+ * https://opensource.org/licenses/MIT
+ */
+#pragma once
 #include <string>
 #include <vector>
 
@@ -40,4 +44,3 @@ struct option
 
 int process(int argc, const char** argv, const std::vector<option>& options);
 
-#endif //OPT_PROCESSOR_H
