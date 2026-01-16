@@ -104,3 +104,19 @@ void print_doc(const pugi::xml_document& doc, const std::string& title) {
     doc.save(std::cout, "  ");
     std::cout << std::endl;
 }
+
+std::vector<int> range(const int max)
+{
+    return range(0,max);
+}
+
+std::vector<int> range(const int min, const int max)
+{
+    std::vector<int> result;
+    result.reserve(max-min);
+    for (int i = min; i<max; i++)
+    {
+        result.push_back(i);
+    }
+    return result;
+}

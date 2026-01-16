@@ -19,6 +19,7 @@ add_executable(CppCommandMark main.cpp
         Util/config_and_constants.h
         Util/util.cpp
         Util/util.h
+        Tasks/OneLineTaskWithName.cpp
 )
 
 add_executable(test test.cpp
