@@ -15,7 +15,6 @@
 #include <unistd.h>
 #include <fstream>
 #include <vector>
-#include <fmt/format.h>
 #include <algorithm>
 #include <cstdlib>
 #include <pugixml.hpp>
@@ -256,7 +255,7 @@ std::vector<std::unique_ptr<Task>> get_task_list()
     pugi::xml_document doc;
     if (!doc.load_file(config.file_path.c_str()))
     {
-        error_messages.emplace_back(fmt::format("get_task_list() error: could not load xml document from {}\n",config.file_path));
+        error_messages.emplace_back(std::format("get_task_list() error: could not load xml document from {}\n",config.file_path));
     }
 
     for (pugi::xml_node node : doc.child("root").children())
@@ -365,7 +364,7 @@ int choose(std::string& command, long& id)
             break;
         case 3: // ctrl + c
         case 27: // esc
-            error_messages.emplace_back(fmt::format("choose() error: interrupted\n"));
+            error_messages.emplace_back(std::format("choose() error: interrupted\n"));
             result = EXIT_FAILURE;
             continue_flag = false;
             continue;
@@ -532,7 +531,7 @@ int main(const int argc, const char** argv)
         }
         if ((result = leave_text_in_terminal(param.c_str())) != EXIT_SUCCESS)
         {
-            error_messages.emplace_back(fmt::format("{}", param));
+            error_messages.emplace_back(std::format("{}", param));
         }
         break;
     case DELETE:

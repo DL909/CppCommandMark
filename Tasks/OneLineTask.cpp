@@ -3,9 +3,7 @@
 //
 
 #include <pugixml.hpp>
-#include <fmt/format.h>
 #include <ncurses.h>
-
 #include "../Util/config_and_constants.h"
 #include "fuzzy_match.h"
 #include "Task.h"
@@ -20,7 +18,6 @@ public:
     {
         this->command = node.child("command").text().as_string();
         this->path = node.child("path").text().as_string();
-
     }
     ~OneLineTask() override = default;
 
@@ -31,7 +28,7 @@ public:
         std::getline(std::cin, command);
         if (command.empty())
         {
-            error_messages.emplace_back(fmt::format("Error: invalid"));
+            error_messages.emplace_back(std::format("Error: invalid"));
             return EXIT_FAILURE;
         }
         std::cout << "enter path(" << get_path() << "):" << std::endl;
@@ -41,12 +38,12 @@ public:
         {
             path = get_path();
         }
-        std::cout << fmt::format("Adding one line task: \ncommand: {}\npath:    {}\nconfirm(Y/n):", command, path) << std::endl;
+        std::cout << std::format("Adding one line task: \ncommand: {}\npath:    {}\nconfirm(Y/n):", command, path) << std::endl;
         const int c = std::cin.get();
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         if (!(c == 'y' || c == '\n' || c == 'Y' || c == '\r'))
         {
-            error_messages.emplace_back(fmt::format("Error: user canceled"));
+            error_messages.emplace_back(std::format("Error: user canceled"));
             return EXIT_FAILURE;
         }
         pack(index, command, path, root);
@@ -152,7 +149,7 @@ public:
 
     std::string get_output() override
     {
-        return fmt::format("cd \"{}\";{}",path,command);
+        return std::format("cd \"{}\";{}",path,command);
     }
 
     pugi::xml_node save() override

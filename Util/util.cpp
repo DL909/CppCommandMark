@@ -8,7 +8,6 @@
 #include <iostream>
 #include <ncurses.h>
 #include <unistd.h>
-#include <fmt/format.h>
 #include <sys/ioctl.h>
 #include <sys/ttycom.h>
 
@@ -76,7 +75,7 @@ std::string get_path()
     }
     catch (const std::filesystem::filesystem_error& e)
     {
-        error_messages.emplace_back(fmt::format("get_path() error: {}\n", e.what()));
+        error_messages.emplace_back(std::format("get_path() error: {}\n", e.what()));
         return "";
     }
 }
@@ -89,10 +88,9 @@ int leave_text_in_terminal(const char* text_to_leave)
     for (int i = 0; i < strlen(text_to_leave); ++i)
     {
         char c = text_to_leave[i];
-        int t = ioctl(STDIN_FILENO, TIOCSTI, &c);
-        if (t < 0)
+        if (const int t = ioctl(STDIN_FILENO, TIOCSTI, &c); t < 0)
         {
-            error_messages.emplace_back(fmt::format("leave_text_in_terminal() error: ioctl() failed : {}\n",errno));
+            error_messages.emplace_back(std::format("leave_text_in_terminal() error: ioctl() failed : {}\n",errno));
             return EXIT_FAILURE;
         }
     }
