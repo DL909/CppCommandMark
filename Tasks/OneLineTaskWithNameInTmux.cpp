@@ -11,22 +11,22 @@
 #include "TaskTypeRegistrar.h"
 #include "../Util/util.h"
 
-class OneLineTaskWithName final : public Task
+class OneLineTaskWithNameInTmux final : public Task
 {
 public:
 
-    OneLineTaskWithName(const int index_, const pugi::xml_node& node) : Task(index_, node)
+    OneLineTaskWithNameInTmux(const int index_, const pugi::xml_node& node) : Task(index_, node)
     {
         this->name = node.child("name").text().as_string();
         this->command = node.child("command").text().as_string();
         this->path = node.child("path").text().as_string();
 
     }
-    ~OneLineTaskWithName() override = default;
+    ~OneLineTaskWithNameInTmux() override = default;
 
     static int create(const int index, pugi::xml_node & root)
     {
-        std::cout << "enter name:" << std::endl;
+        std::cout << "enter name(also used as tmux session name):" << std::endl;
         std::string name;
         std::getline(std::cin, name);
         if (name.empty())
@@ -49,7 +49,7 @@ public:
         {
             path = get_path();
         }
-        std::cout << std::format("Adding one line task with name: \nname: {}\ncommand: {}\npath:    {}\nconfirm(Y/n):", name, command, path) << std::endl;
+        std::cout << std::format("Adding one line task in tmux with name(also used as tmux session name): \nname: {}\ncommand: {}\npath:    {}\nconfirm(Y/n):", name, command, path) << std::endl;
         const int c = std::cin.get();
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         if (!(c == 'y' || c == '\n' || c == 'Y' || c == '\r'))
@@ -76,7 +76,7 @@ public:
         const int name_start = 2 + (config.verbose_flag ? score_long : 0);
         const int path_start = name_cols + 10 + (config.verbose_flag ? score_long : 0);
         if (config.verbose_flag) { mvprintw(line, 2, "%ld", this -> score); }
-        bold_mvprintw(line,name_start,this->name,name_cols,bold_list);
+        bold_mvprintw(line,name_start,"TMUX: " + this->name,name_cols,bold_list);
         bold_mvprintw(line,path_start,this->path,path_cols,{});
         if (choose)
         {
@@ -87,21 +87,25 @@ public:
 
     int update_score(const std::string& input) override
     {
-        if (input == this->name)
+        if (std::string new_input = input; new_input == this->name)
         {
             this->score = INT32_MAX;
         }else
         {
             this->score = 0;
-
-            bold_list.clear();
-
-            score += fuzzy_match(input.c_str(), this->name.c_str());
+            new_input = new_input.substr(first_not_space_in_text(new_input));
+            int a = begin_with_part_of(new_input, "tmux:");
+            this->score += 20 * a;
+            bold_list = range(a);
+            new_input = new_input.substr(a);
+            a = first_not_space_in_text(new_input);
+            new_input = new_input.substr(a);
+            score += fuzzy_match(new_input.c_str(), this->name.c_str());
 
             if (score > -30000)
             {
                 const node * p = match_end;
-                int i = -1;
+                int i = -1 + 6; // 6 because 'TMUX: ' is 6 char
 
                 while (p != nullptr)
                 {
@@ -117,7 +121,7 @@ public:
 
     std::string get_output() override
     {
-        return std::format("cd \"{}\";{}",path,command);
+        return std::format("tmux new-session -d -s {0}&&tmux send-keys -t {0} 'cd \"{1}\";{2}' Enter",this->name, path,command);
     }
 
     pugi::xml_node save() override
@@ -125,7 +129,7 @@ public:
         pugi::xml_node node_task;
         node_task.set_name("task");
         pugi::xml_node node_type = node_task.append_child("type");
-        node_type.text().set("one_line_task_with_name");
+        node_type.text().set("one_line_task_with_name_in_tmux");
         pugi::xml_node node_index = node_task.append_child("index");
         node_index.text().set(this->index);
         pugi::xml_node data = node_task.append_child("data");
@@ -145,14 +149,14 @@ private:
     std::string name;
     std::string command;
     std::string path;
-    std::vector<int> bold_list;
+    std::vector<int> bold_list = {};
 
     static void pack(const int _index, const std::string& _name, const std::string& _command, const std::string& _path, pugi::xml_node & _root)
     {
         pugi::xml_node task = _root.append_child(_command);
         task.set_name("task");
         pugi::xml_node type = task.append_child("type");
-        type.text().set("one_line_task_with_name");
+        type.text().set("one_line_task_with_name_in_tmux");
         pugi::xml_node index = task.append_child("index");
         index.text().set(_index);
         pugi::xml_node data = task.append_child("data");
@@ -165,5 +169,5 @@ private:
     }
 };
 
-[[maybe_unused]] static TaskTypeRegistrar<OneLineTaskWithName> registrar("one_line_task_with_name");
-[[maybe_unused]] static UserTaskTypeRegistrar user_registrar("one_line_task_with_name",&OneLineTaskWithName::create);
+[[maybe_unused]] static TaskTypeRegistrar<OneLineTaskWithNameInTmux> registrar("one_line_task_with_name_in_tmux");
+[[maybe_unused]] static UserTaskTypeRegistrar user_registrar("one_line_task_with_name_in_tmux",&OneLineTaskWithNameInTmux::create);

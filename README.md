@@ -57,6 +57,24 @@ In case you really want to use this feature right now, using this command to ena
     sudo sysctl -w dev.tty.legacy_tiocsti=1
 ```
 
+## Task type
+
+### One Line Task
+
+task in one line that runs in specific directory.
+
+### One Line Task With Name
+
+task in one line that runs in specific directory and has a name to recognize and search.
+
+### One Line Task With Name In Tmux
+
+task in one line that runs in specific directory and has a name to recognize.
+
+however, will open a background tmux session instead of running directly.
+
+require tmux installed.
+
 ## plan of future
 
 - more kind of tasks

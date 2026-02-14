@@ -120,3 +120,32 @@ std::vector<int> range(const int min, const int max)
     }
     return result;
 }
+
+unsigned int tolower(const unsigned int c)
+{
+    if (c >= 'A' && c <= 'Z')
+    {
+        return c - 'A' + 'a';
+    }
+    return c;
+}
+
+int begin_with_part_of(const std::string& text, const std::string& pattern, bool case_sensitive)
+{
+    int index = 0;
+    while (index < text.length() && index < pattern.length() && (case_sensitive?text[index]:tolower(text[index])) == (case_sensitive?pattern[index]:tolower(pattern[index])))
+    {
+        index++;
+    }
+    return index;
+}
+
+int first_not_space_in_text(const std::string& text)
+{
+    int index = 0;
+    while (index < text.length() && text[index] == ' ')
+    {
+        index++;
+    }
+    return index;
+}

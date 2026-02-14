@@ -111,7 +111,7 @@ public:
 
         const node * p = match_end;
         int i = -1;
-        command_list = {};
+        command_list.clear();
 
         while (p != nullptr)
         {
@@ -126,7 +126,7 @@ public:
 
         p = match_end;
         i = -1;
-        path_list = {};
+        path_list.clear();
 
         while (p != nullptr)
         {

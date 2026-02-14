@@ -91,10 +91,25 @@ void test3()
 
 }
 
+void test4()
+{
+    std::cout << begin_with_part_of("tm experiment","tmux") << std::endl;
+}
 
+void test5()
+{
+    int score = 0;
+    std::string new_input = "tm experiment";
+    new_input = new_input.substr(first_not_space_in_text(new_input));
+    int a = begin_with_part_of(new_input, "tmux");
+    new_input = new_input.substr(a);
+    a = first_not_space_in_text(new_input);
+    new_input = new_input.substr(a);
+    std::cout << new_input << std::endl;
+}
 
 int main() {
-    test3();
+    test5();
 
     return 0;
 }

@@ -20,6 +20,7 @@ add_executable(CppCommandMark main.cpp
         Util/util.cpp
         Util/util.h
         Tasks/OneLineTaskWithName.cpp
+        Tasks/OneLineTaskWithNameInTmux.cpp
 )
 
 add_executable(test test.cpp
