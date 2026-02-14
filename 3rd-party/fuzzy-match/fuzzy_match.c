@@ -33,7 +33,7 @@ static int32_t fuzzy_match_recurse(
 		bool first_char,
 		struct node * * list);
 
-
+int malloc_time = 0;
 
 /*
  * Returns score if each character in pattern is found sequentially within str.
@@ -96,11 +96,13 @@ int32_t fuzzy_match_recurse(
     if (*list == NULL)
     {
         *list = malloc(sizeof(struct node));
+        malloc_time++;
         (*list)->next = NULL;
         (*list)->number = 0;
     }else
     {
         (*list)->next = malloc(sizeof(struct node));
+        malloc_time++;
         (*list)->next->next = NULL;
         (*list)->next->number = 0;
     }
@@ -149,6 +151,7 @@ int recursive_delete(struct node* p)
 	{
 		struct node* next = p->next;
 		free(p);
+	    malloc_time--;
 		p = next;
 	}
 	return 0;

@@ -16,3 +16,11 @@ std::string get_path();
 int leave_text_in_terminal(const char* text_to_leave);
 
 void print_doc(const pugi::xml_document& doc, const std::string& title);
+
+std::vector<int> range(int max);
+
+std::vector<int> range(int min, int max);
+
+int begin_with_part_of(const std::string& text, const std::string& pattern, bool case_sensitive=false);
+
+int first_not_space_in_text(const std::string& text);

@@ -15,7 +15,6 @@
 #include <unistd.h>
 #include <fstream>
 #include <vector>
-#include <fmt/format.h>
 #include <algorithm>
 #include <cstdlib>
 #include <pugixml.hpp>
@@ -57,9 +56,8 @@ inline void sort_scored_types(std::vector<scored_task_type> & types)
         return a.score > b.score;
     });
 }
-int mark(const std::string& command)
+int mark()
 {
-
     std::vector<scored_task_type> types;
     for (const auto& name : UserTaskFactory::get_user_create_task_type_list())
     {
@@ -117,9 +115,10 @@ int mark(const std::string& command)
             mvprintw(0, 0, "choice  : %d", choice);
         }
         int i = 0;
-        for (const auto & type  : types)
+        for (const auto & [name, score]  : types)
         {
-            mvprintw(LINES - 2 - i, 0, "%c %s", choice == i?'*' : ' ',type.name.c_str());
+            mvprintw(LINES - 2 - i, 0, "%c %s", choice == i?'*' : ' ',name.c_str());
+            i++;
         }
         mvprintw(LINES - 1, 2, "%s", (static_cast<std::string>(" ") * (COLS - 2)).c_str());
         mvprintw(LINES - 1, 2, "%s", input.c_str());
@@ -198,8 +197,11 @@ int mark(const std::string& command)
     }
     if (UserTaskFactory::create(types[choice].name,root.last_child().child("index").text().as_int()+1, root) == EXIT_SUCCESS)
     {
-        std::cout << "successfully added task" << std::endl;
-        return EXIT_SUCCESS;
+        if (doc.save_file(config.file_path.c_str()))
+        {
+            std::cout << "successfully added task" << std::endl;
+            return EXIT_SUCCESS;
+        }
     }
     std::cerr << "failed to add task" << std::endl;
     return EXIT_FAILURE;
@@ -256,7 +258,7 @@ std::vector<std::unique_ptr<Task>> get_task_list()
     pugi::xml_document doc;
     if (!doc.load_file(config.file_path.c_str()))
     {
-        error_messages.emplace_back(fmt::format("get_task_list() error: could not load xml document from {}\n",config.file_path));
+        error_messages.emplace_back(std::format("get_task_list() error: could not load xml document from {}\n",config.file_path));
     }
 
     for (pugi::xml_node node : doc.child("root").children())
@@ -365,7 +367,7 @@ int choose(std::string& command, long& id)
             break;
         case 3: // ctrl + c
         case 27: // esc
-            error_messages.emplace_back(fmt::format("choose() error: interrupted\n"));
+            error_messages.emplace_back(std::format("choose() error: interrupted\n"));
             result = EXIT_FAILURE;
             continue_flag = false;
             continue;
@@ -524,7 +526,7 @@ int main(const int argc, const char** argv)
         result = EXIT_FAILURE;
         break;
     case MARK:
-        return mark(param);
+        return mark();
     case CHECK:
         if ((result = choose(param, id)) != EXIT_SUCCESS)
         {
@@ -532,7 +534,7 @@ int main(const int argc, const char** argv)
         }
         if ((result = leave_text_in_terminal(param.c_str())) != EXIT_SUCCESS)
         {
-            error_messages.emplace_back(fmt::format("{}", param));
+            error_messages.emplace_back(std::format("{}", param));
         }
         break;
     case DELETE:

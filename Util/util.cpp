@@ -8,7 +8,6 @@
 #include <iostream>
 #include <ncurses.h>
 #include <unistd.h>
-#include <fmt/format.h>
 #include <sys/ioctl.h>
 #include <sys/ttycom.h>
 
@@ -76,7 +75,7 @@ std::string get_path()
     }
     catch (const std::filesystem::filesystem_error& e)
     {
-        error_messages.emplace_back(fmt::format("get_path() error: {}\n", e.what()));
+        error_messages.emplace_back(std::format("get_path() error: {}\n", e.what()));
         return "";
     }
 }
@@ -89,10 +88,9 @@ int leave_text_in_terminal(const char* text_to_leave)
     for (int i = 0; i < strlen(text_to_leave); ++i)
     {
         char c = text_to_leave[i];
-        int t = ioctl(STDIN_FILENO, TIOCSTI, &c);
-        if (t < 0)
+        if (const int t = ioctl(STDIN_FILENO, TIOCSTI, &c); t < 0)
         {
-            error_messages.emplace_back(fmt::format("leave_text_in_terminal() error: ioctl() failed : {}\n",errno));
+            error_messages.emplace_back(std::format("leave_text_in_terminal() error: ioctl() failed : {}\n",errno));
             return EXIT_FAILURE;
         }
     }
@@ -105,4 +103,49 @@ void print_doc(const pugi::xml_document& doc, const std::string& title) {
     std::cout << "--- " << title << " ---" << std::endl;
     doc.save(std::cout, "  ");
     std::cout << std::endl;
+}
+
+std::vector<int> range(const int max)
+{
+    return range(0,max);
+}
+
+std::vector<int> range(const int min, const int max)
+{
+    std::vector<int> result;
+    result.reserve(max-min);
+    for (int i = min; i<max; i++)
+    {
+        result.push_back(i);
+    }
+    return result;
+}
+
+unsigned int tolower(const unsigned int c)
+{
+    if (c >= 'A' && c <= 'Z')
+    {
+        return c - 'A' + 'a';
+    }
+    return c;
+}
+
+int begin_with_part_of(const std::string& text, const std::string& pattern, bool case_sensitive)
+{
+    int index = 0;
+    while (index < text.length() && index < pattern.length() && (case_sensitive?text[index]:tolower(text[index])) == (case_sensitive?pattern[index]:tolower(pattern[index])))
+    {
+        index++;
+    }
+    return index;
+}
+
+int first_not_space_in_text(const std::string& text)
+{
+    int index = 0;
+    while (index < text.length() && text[index] == ' ')
+    {
+        index++;
+    }
+    return index;
 }
